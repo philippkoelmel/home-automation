@@ -27,6 +27,8 @@ void setRelay(bool on) {
     relayOnSince = millis();
   }
   applyRelay();
+  digitalWrite(LED_BUILTIN, on ? LOW : HIGH); // LED_BUILTIN is active-low on the D1 Mini Pro
+  Serial.println(on ? "[relay] ON" : "[relay] OFF");
 }
 
 bool checkAuth() {
@@ -62,6 +64,7 @@ void ensureWiFi() {
   if (WiFi.status() == WL_CONNECTED) return;
   if (millis() - lastWifiAttempt < WIFI_RETRY_INTERVAL_MS) return;
   lastWifiAttempt = millis();
+  Serial.println("[wifi] reconnecting...");
   WiFi.disconnect();
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 }
@@ -69,15 +72,29 @@ void ensureWiFi() {
 void setup() {
   // Relay defaults to off before anything else runs, including before WiFi connects.
   pinMode(RELAY_PIN, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   setRelay(false);
 
   Serial.begin(115200);
+  Serial.println();
+  Serial.println("[boot] Myto IR controller starting");
 
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.print("[wifi] connecting to ");
+  Serial.print(WIFI_SSID);
   unsigned long start = millis();
   while (WiFi.status() != WL_CONNECTED && millis() - start < 20000) {
     delay(250);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("[wifi] connected, IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("[wifi] not connected yet, will keep retrying in background");
   }
 
   MDNS.begin(MDNS_HOSTNAME);
@@ -88,6 +105,7 @@ void setup() {
   server.begin();
 
   MDNS.addService("http", "tcp", 80);
+  Serial.println("[http] server started on port 80, hostname " MDNS_HOSTNAME ".local");
 }
 
 void loop() {
